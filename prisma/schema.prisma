@@ -1,0 +1,461 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  COMMERCIAL
+  VIEWER
+}
+
+enum ContractForm {
+  JCT_ICSUB
+  DOM1
+  BESPOKE
+  SCHEME_DEFAULT
+}
+
+enum DayType {
+  CALENDAR
+  BUSINESS
+}
+
+enum ApplicationDueDateRule {
+  FIXED_DAY_OF_MONTH
+  FIXED_DAY_OF_WEEK
+  MILESTONE
+}
+
+enum CycleStatus {
+  AWAITING_APPLICATION
+  APPLICATION_RECEIVED
+  UNDER_ASSESSMENT
+  NOTICE_SERVED
+  PAY_LESS_SERVED
+  PAID
+  CLOSED
+}
+
+enum NoticeType {
+  PAYMENT
+  PAY_LESS
+}
+
+enum NoticeStatus {
+  DRAFT
+  PENDING_APPROVAL
+  SERVED
+}
+
+enum ServiceMethod {
+  EMAIL
+  POST
+  HAND
+}
+
+enum VariationStatus {
+  PROPOSED
+  INSTRUCTED
+  AGREED
+}
+
+enum DocumentStatus {
+  VALID
+  EXPIRING_SOON
+  EXPIRED
+  MISSING
+}
+
+enum AlertType {
+  DEADLINE_APPROACHING
+  DEADLINE_BREACHED
+  ESCALATION
+  RETENTION_RELEASE
+  DOCUMENT_EXPIRY
+  DAILY_DIGEST
+}
+
+// ─── Organisation (tenant) ───────────────────────────────────────────────────
+
+model Organisation {
+  id               String   @id @default(cuid())
+  clerkOrgId       String   @unique
+  name             String
+  logoUrl          String?
+  fromEmail        String?
+  fromName         String?
+  requiredDocTypes String[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  members        OrgMember[]
+  projects       Project[]
+  subcontractors Subcontractor[]
+  alertConfigs   AlertConfig[]
+
+  @@map("organisations")
+}
+
+model OrgMember {
+  id             String   @id @default(cuid())
+  clerkUserId    String
+  organisationId String
+  role           Role     @default(COMMERCIAL)
+  name           String
+  email          String
+  escalationTo   String?
+  createdAt      DateTime @default(now())
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@unique([clerkUserId, organisationId])
+  @@map("org_members")
+}
+
+// ─── Project ─────────────────────────────────────────────────────────────────
+
+model Project {
+  id             String   @id @default(cuid())
+  organisationId String
+  name           String
+  reference      String?
+  address        String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organisation Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  subcontracts SubcontractOrder[]
+
+  @@map("projects")
+}
+
+// ─── Subcontractor ────────────────────────────────────────────────────────────
+
+model Subcontractor {
+  id             String   @id @default(cuid())
+  organisationId String
+  name           String
+  companyNumber  String?
+  contactEmails  String[]
+  cisStatus      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organisation   Organisation         @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  subcontracts   SubcontractOrder[]
+  complianceDocs ComplianceDocument[]
+
+  @@map("subcontractors")
+}
+
+// ─── SubcontractOrder ─────────────────────────────────────────────────────────
+
+model SubcontractOrder {
+  id               String       @id @default(cuid())
+  organisationId   String
+  projectId        String
+  subcontractorId  String
+  reference        String
+  description      String?
+  contractForm     ContractForm @default(SCHEME_DEFAULT)
+  contractSum      Decimal      @db.Decimal(14, 2)
+  retentionPct     Decimal      @db.Decimal(5, 4) @default(0.05)
+  retentionCap     Decimal?     @db.Decimal(5, 4)
+  mcdStartDate     DateTime?
+  mcdEndDate       DateTime?
+  signatory        String?
+  noticeRecipients String[]
+  inboundEmail     String?      @unique
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subcontractor   Subcontractor    @relation(fields: [subcontractorId], references: [id])
+  paymentSchedule PaymentSchedule?
+  variations        Variation[]
+  retentionLedger   RetentionLedger?
+  auditEvents       AuditEvent[]
+  scheduleLines     ActivityScheduleLine[]
+
+  @@map("subcontract_orders")
+}
+
+// ─── Activity Schedule (template lines, set at contract setup) ────────────────
+
+model ActivityScheduleLine {
+  id                 String   @id @default(cuid())
+  subcontractOrderId String
+  sortOrder          Int
+  itemRef            String
+  description        String
+  contractValue      Decimal  @db.Decimal(14, 2)
+  isVariation        Boolean  @default(false)
+  indentLevel        Int      @default(0)
+  variationId        String?
+  createdAt          DateTime @default(now())
+
+  subcontractOrder SubcontractOrder @relation(fields: [subcontractOrderId], references: [id], onDelete: Cascade)
+
+  @@map("activity_schedule_lines")
+}
+
+// ─── Payment Schedule ─────────────────────────────────────────────────────────
+
+model PaymentSchedule {
+  id                        String                 @id @default(cuid())
+  subcontractOrderId        String                 @unique
+  appDueDateRule            ApplicationDueDateRule @default(FIXED_DAY_OF_MONTH)
+  appDueDayOfMonth          Int?
+  appDueDayOfWeek           Int?
+  appDueWeekOfMonth         Int?
+  dueDateOffsetDays         Int                    @default(7)
+  dueDateOffsetType         DayType                @default(CALENDAR)
+  paymentNoticeDeadlineDays Int                    @default(5)
+  paymentNoticeDeadlineType DayType                @default(CALENDAR)
+  finalDateOffsetDays       Int                    @default(21)
+  finalDateOffsetType       DayType                @default(CALENDAR)
+  payLessDeadlineDays       Int                    @default(7)
+  payLessDeadlineType       DayType                @default(CALENDAR)
+  scheduleStartDate         DateTime
+  scheduleEndDate           DateTime
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+
+  subcontractOrder SubcontractOrder @relation(fields: [subcontractOrderId], references: [id], onDelete: Cascade)
+  cycles           PaymentCycle[]
+
+  @@map("payment_schedules")
+}
+
+// ─── Payment Cycle ────────────────────────────────────────────────────────────
+
+model PaymentCycle {
+  id                    String      @id @default(cuid())
+  paymentScheduleId     String
+  cycleNumber           Int
+  applicationExpectedDate DateTime
+  dueDate               DateTime
+  paymentNoticeDeadline DateTime
+  finalDateForPayment   DateTime
+  payLessDeadline       DateTime
+  status                CycleStatus @default(AWAITING_APPLICATION)
+  dateDerivation        Json
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  paymentSchedule PaymentSchedule @relation(fields: [paymentScheduleId], references: [id], onDelete: Cascade)
+  application     Application?
+  assessment      Assessment?
+  paymentNotice   PaymentNotice?
+  payLessNotice   PayLessNotice?
+
+  @@unique([paymentScheduleId, cycleNumber])
+  @@map("payment_cycles")
+}
+
+// ─── Application ─────────────────────────────────────────────────────────────
+
+model Application {
+  id             String   @id @default(cuid())
+  paymentCycleId String   @unique
+  amountApplied  Decimal  @db.Decimal(14, 2)
+  dateReceived   DateTime
+  receivedVia    String?
+  attachmentUrl  String?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  paymentCycle PaymentCycle @relation(fields: [paymentCycleId], references: [id], onDelete: Cascade)
+
+  @@map("applications")
+}
+
+// ─── Assessment ──────────────────────────────────────────────────────────────
+
+model Assessment {
+  id              String    @id @default(cuid())
+  paymentCycleId  String    @unique
+  isLocked        Boolean   @default(false)
+  grossValuation  Decimal   @db.Decimal(14, 2) @default(0)
+  retentionAmount Decimal   @db.Decimal(14, 2) @default(0)
+  previouslyCert  Decimal   @db.Decimal(14, 2) @default(0)
+  netThisCycle    Decimal   @db.Decimal(14, 2) @default(0)
+  lastSavedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  paymentCycle PaymentCycle     @relation(fields: [paymentCycleId], references: [id], onDelete: Cascade)
+  lines        AssessmentLine[]
+
+  @@map("assessments")
+}
+
+model AssessmentLine {
+  id                  String   @id @default(cuid())
+  assessmentId        String
+  sortOrder           Int
+  itemRef             String
+  description         String
+  contractValue       Decimal  @db.Decimal(14, 2)
+  isVariation         Boolean  @default(false)
+  indentLevel         Int      @default(0)
+  variationId         String?
+  qtyOrPctComplete    Decimal? @db.Decimal(8, 4)
+  valueToDate         Decimal  @db.Decimal(14, 2) @default(0)
+  previouslyCertified Decimal  @db.Decimal(14, 2) @default(0)
+  thisCycle           Decimal  @db.Decimal(14, 2) @default(0)
+  overrideCapFlag     Boolean  @default(false)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@map("assessment_lines")
+}
+
+// ─── Notices ─────────────────────────────────────────────────────────────────
+
+model PaymentNotice {
+  id             String        @id @default(cuid())
+  paymentCycleId String        @unique
+  status         NoticeStatus  @default(DRAFT)
+  sumDue         Decimal       @db.Decimal(14, 2)
+  basis          String?
+  pdfUrl         String?
+  servedAt       DateTime?
+  serviceMethod  ServiceMethod?
+  servedByUserId String?
+  deliveryLogId  String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  paymentCycle PaymentCycle @relation(fields: [paymentCycleId], references: [id], onDelete: Cascade)
+
+  @@map("payment_notices")
+}
+
+model PayLessNotice {
+  id             String        @id @default(cuid())
+  paymentCycleId String        @unique
+  status         NoticeStatus  @default(DRAFT)
+  sumDue         Decimal       @db.Decimal(14, 2)
+  basis          String?
+  pdfUrl         String?
+  servedAt       DateTime?
+  serviceMethod  ServiceMethod?
+  servedByUserId String?
+  deliveryLogId  String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  paymentCycle PaymentCycle @relation(fields: [paymentCycleId], references: [id], onDelete: Cascade)
+
+  @@map("pay_less_notices")
+}
+
+// ─── Variation Register ───────────────────────────────────────────────────────
+
+model Variation {
+  id                 String          @id @default(cuid())
+  subcontractOrderId String
+  reference          String
+  description        String
+  instructedBy       String?
+  instructionDate    DateTime?
+  status             VariationStatus @default(PROPOSED)
+  estimatedValue     Decimal?        @db.Decimal(14, 2)
+  agreedValue        Decimal?        @db.Decimal(14, 2)
+  attachmentUrls     String[]
+  notes              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  subcontractOrder SubcontractOrder @relation(fields: [subcontractOrderId], references: [id], onDelete: Cascade)
+
+  @@map("variations")
+}
+
+// ─── Retention Ledger ─────────────────────────────────────────────────────────
+
+model RetentionLedger {
+  id                 String    @id @default(cuid())
+  subcontractOrderId String    @unique
+  totalHeld          Decimal   @db.Decimal(14, 2) @default(0)
+  pcReleaseDate      DateTime?
+  pcReleaseAmount    Decimal?  @db.Decimal(14, 2)
+  pcReleasedAt       DateTime?
+  mcdReleaseDate     DateTime?
+  mcdReleaseAmount   Decimal?  @db.Decimal(14, 2)
+  mcdReleasedAt      DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  subcontractOrder SubcontractOrder @relation(fields: [subcontractOrderId], references: [id], onDelete: Cascade)
+
+  @@map("retention_ledgers")
+}
+
+// ─── Compliance Documents ─────────────────────────────────────────────────────
+
+model ComplianceDocument {
+  id              String         @id @default(cuid())
+  subcontractorId String
+  documentType    String
+  fileUrl         String?
+  issueDate       DateTime?
+  expiryDate      DateTime?
+  status          DocumentStatus @default(MISSING)
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  subcontractor Subcontractor @relation(fields: [subcontractorId], references: [id], onDelete: Cascade)
+
+  @@map("compliance_documents")
+}
+
+// ─── Alert Config ─────────────────────────────────────────────────────────────
+
+model AlertConfig {
+  id             String    @id @default(cuid())
+  organisationId String
+  alertType      AlertType
+  offsetDays     Int
+  enabled        Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@map("alert_configs")
+}
+
+// ─── Audit Log (append-only) ──────────────────────────────────────────────────
+
+model AuditEvent {
+  id                 String   @id @default(cuid())
+  organisationId     String
+  subcontractOrderId String?
+  paymentCycleId     String?
+  userId             String?
+  eventType          String
+  payload            Json
+  createdAt          DateTime @default(now())
+
+  subcontractOrder SubcontractOrder? @relation(fields: [subcontractOrderId], references: [id])
+
+  @@index([organisationId, createdAt])
+  @@index([subcontractOrderId])
+  @@index([paymentCycleId])
+  @@map("audit_events")
+}
