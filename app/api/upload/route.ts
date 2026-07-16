@@ -1,11 +1,11 @@
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
 import { NextRequest, NextResponse } from "next/server"
-import { put } from "@vercel/blob"
 import { requireOrgRoute } from "@/lib/auth"
 
 // Compliance documents, variation attachments, and application attachments
 // go through this endpoint — restrict to document-like file types.
 const ALLOWED_EXTENSIONS = new Set(["pdf", "png", "jpg", "jpeg", "doc", "docx", "xls", "xlsx"])
-const ALLOWED_MIME_TYPES = new Set([
+const ALLOWED_MIME_TYPES = [
   "application/pdf",
   "image/png",
   "image/jpeg",
@@ -13,35 +13,39 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-])
+]
 
-export async function POST(req: NextRequest) {
+// Client-upload flow: the browser gets a short-lived token from this route,
+// then uploads the file bytes directly to Blob storage — the file never
+// passes through this (or any) serverless function, so it isn't subject to
+// Vercel's request body size limit. See lib/upload-client.ts for the client
+// side of this handshake.
+export async function POST(request: NextRequest): Promise<NextResponse> {
   const authResult = await requireOrgRoute({ minRole: "COMMERCIAL" })
   if (!authResult.ok) return authResult.response
-  const { org } = authResult
 
-  const formData = await req.formData()
-  const file = formData.get("file") as File | null
-  if (!file || file.size === 0) {
-    return NextResponse.json({ error: "No file provided" }, { status: 400 })
-  }
+  const body = (await request.json()) as HandleUploadBody
 
-  if (file.size > 20 * 1024 * 1024) {
-    return NextResponse.json({ error: "File too large (max 20 MB)" }, { status: 400 })
-  }
-
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
-  if (!ALLOWED_EXTENSIONS.has(ext) || (file.type && !ALLOWED_MIME_TYPES.has(file.type))) {
+  try {
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (pathname) => {
+        const ext = pathname.split(".").pop()?.toLowerCase() ?? ""
+        if (!ALLOWED_EXTENSIONS.has(ext)) {
+          throw new Error("Unsupported file type. Allowed: PDF, PNG, JPG, DOC(X), XLS(X).")
+        }
+        return {
+          allowedContentTypes: ALLOWED_MIME_TYPES,
+          maximumSizeInBytes: 20 * 1024 * 1024,
+        }
+      },
+    })
+    return NextResponse.json(jsonResponse)
+  } catch (error) {
     return NextResponse.json(
-      { error: "Unsupported file type. Allowed: PDF, PNG, JPG, DOC(X), XLS(X)." },
+      { error: error instanceof Error ? error.message : "Upload failed" },
       { status: 400 }
     )
   }
-
-  // Scoped by organisation (not just the uploading user) so files are
-  // grouped per-tenant, matching how every other resource in the app is scoped.
-  const filename = `compliance/${org.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`
-
-  const blob = await put(filename, file, { access: "public" })
-  return NextResponse.json({ url: blob.url })
 }

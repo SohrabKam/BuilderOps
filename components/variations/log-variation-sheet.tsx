@@ -3,6 +3,7 @@ import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { createVariation } from "@/lib/actions/variations"
+import { uploadDocument } from "@/lib/upload-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -35,14 +36,7 @@ export function LogVariationSheet({ orderId }: { orderId: string }) {
     if (!file) return
     setUploading(true)
     try {
-      const fd = new FormData()
-      fd.append("file", file)
-      const res = await fetch("/api/upload", { method: "POST", body: fd })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? "Upload failed")
-      }
-      const { url } = await res.json()
+      const url = await uploadDocument(file)
       setAttachmentUrls((prev) => [...prev, url])
       toast.success("File attached")
     } catch (err) {
