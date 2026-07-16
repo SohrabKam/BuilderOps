@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  // The Prisma client's custom output path (lib/generated/prisma) confuses
+  // Next's build-time file tracer — its native query-engine binary isn't
+  // reachable via a static import/require, so the tracer drops it from the
+  // serverless bundle even though prisma generate produced it. Force it in
+  // for every route rather than debugging which routes the tracer misses.
+  outputFileTracingIncludes: {
+    "/*": ["./lib/generated/prisma/**/*"],
+  },
   // Don't advertise the framework via X-Powered-By.
   poweredByHeader: false,
   async headers() {
