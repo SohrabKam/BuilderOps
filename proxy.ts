@@ -5,6 +5,10 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/api/webhooks(.*)",
   "/api/inbound(.*)",
+  // Authenticated via requireApiKey() (Authorization: Bearer <key>) inside
+  // each route handler, not a Clerk session — must bypass auth.protect()
+  // here or every request gets redirected to /sign-in before it arrives.
+  "/api/v1(.*)",
 ])
 
 export const proxy = clerkMiddleware(async (auth, req) => {

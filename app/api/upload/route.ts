@@ -16,7 +16,7 @@ const ALLOWED_MIME_TYPES = new Set([
 ])
 
 export async function POST(req: NextRequest) {
-  const authResult = await requireOrgRoute()
+  const authResult = await requireOrgRoute({ minRole: "COMMERCIAL" })
   if (!authResult.ok) return authResult.response
   const { org } = authResult
 

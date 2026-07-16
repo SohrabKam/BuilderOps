@@ -20,7 +20,7 @@ const CreateVariationSchema = z.object({
 
 export async function createVariation(formData: FormData) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const attachmentUrlsRaw = formData.get("attachmentUrlsJson") as string | null
     const raw = {
@@ -86,7 +86,7 @@ const UpdateVariationSchema = z.object({
 
 export async function updateVariation(formData: FormData) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const attachmentUrlsRaw = formData.get("attachmentUrlsJson") as string | null
     const raw = {

@@ -9,6 +9,7 @@ import {
   Bell,
   Settings,
   ShieldCheck,
+  Users,
 } from "lucide-react"
 
 const nav = [
@@ -17,6 +18,7 @@ const nav = [
   { href: "/subcontracts", label: "Subcontracts", icon: FileText },
   { href: "/compliance", label: "Compliance Docs", icon: ShieldCheck },
   { href: "/alerts", label: "Alerts", icon: Bell },
+  { href: "/team", label: "Team", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 

@@ -44,7 +44,7 @@ export type CreateContractInput = z.infer<typeof CreateContractSchema>
 
 export async function createContract(input: CreateContractInput) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const data = CreateContractSchema.parse(input)
 

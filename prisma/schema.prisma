@@ -100,6 +100,7 @@ model Organisation {
   projects       Project[]
   subcontractors Subcontractor[]
   alertConfigs   AlertConfig[]
+  apiKeys        ApiKey[]
 
   @@map("organisations")
 }
@@ -120,6 +121,30 @@ model OrgMember {
   @@map("org_members")
 }
 
+// ─── API keys (external integrations — pull/push via /api/v1) ─────────────────
+
+enum ApiKeyScope {
+  READ
+  WRITE
+}
+
+model ApiKey {
+  id             String      @id @default(cuid())
+  organisationId String
+  name           String
+  keyPrefix      String // first 8 chars of the plaintext key, shown in the UI so admins can tell keys apart without re-revealing the secret
+  keyHash        String      @unique // sha256 of the full plaintext key — the plaintext itself is never stored
+  scope          ApiKeyScope @default(READ)
+  createdAt      DateTime    @default(now())
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+
+  organisation Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@index([organisationId])
+  @@map("api_keys")
+}
+
 // ─── Project ─────────────────────────────────────────────────────────────────
 
 model Project {
@@ -132,7 +157,7 @@ model Project {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organisation Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  organisation Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   subcontracts SubcontractOrder[]
 
   @@map("projects")
@@ -168,7 +193,7 @@ model SubcontractOrder {
   description      String?
   contractForm     ContractForm @default(SCHEME_DEFAULT)
   contractSum      Decimal      @db.Decimal(14, 2)
-  retentionPct     Decimal      @db.Decimal(5, 4) @default(0.05)
+  retentionPct     Decimal      @default(0.05) @db.Decimal(5, 4)
   retentionCap     Decimal?     @db.Decimal(5, 4)
   mcdStartDate     DateTime?
   mcdEndDate       DateTime?
@@ -179,13 +204,13 @@ model SubcontractOrder {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  subcontractor   Subcontractor    @relation(fields: [subcontractorId], references: [id])
+  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subcontractor   Subcontractor          @relation(fields: [subcontractorId], references: [id])
   paymentSchedule PaymentSchedule?
-  variations        Variation[]
-  retentionLedger   RetentionLedger?
-  auditEvents       AuditEvent[]
-  scheduleLines     ActivityScheduleLine[]
+  variations      Variation[]
+  retentionLedger RetentionLedger?
+  auditEvents     AuditEvent[]
+  scheduleLines   ActivityScheduleLine[]
 
   @@map("subcontract_orders")
 }
@@ -240,18 +265,18 @@ model PaymentSchedule {
 // ─── Payment Cycle ────────────────────────────────────────────────────────────
 
 model PaymentCycle {
-  id                    String      @id @default(cuid())
-  paymentScheduleId     String
-  cycleNumber           Int
+  id                      String      @id @default(cuid())
+  paymentScheduleId       String
+  cycleNumber             Int
   applicationExpectedDate DateTime
-  dueDate               DateTime
-  paymentNoticeDeadline DateTime
-  finalDateForPayment   DateTime
-  payLessDeadline       DateTime
-  status                CycleStatus @default(AWAITING_APPLICATION)
-  dateDerivation        Json
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  dueDate                 DateTime
+  paymentNoticeDeadline   DateTime
+  finalDateForPayment     DateTime
+  payLessDeadline         DateTime
+  status                  CycleStatus @default(AWAITING_APPLICATION)
+  dateDerivation          Json
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
 
   paymentSchedule PaymentSchedule @relation(fields: [paymentScheduleId], references: [id], onDelete: Cascade)
   application     Application?
@@ -286,10 +311,10 @@ model Assessment {
   id              String    @id @default(cuid())
   paymentCycleId  String    @unique
   isLocked        Boolean   @default(false)
-  grossValuation  Decimal   @db.Decimal(14, 2) @default(0)
-  retentionAmount Decimal   @db.Decimal(14, 2) @default(0)
-  previouslyCert  Decimal   @db.Decimal(14, 2) @default(0)
-  netThisCycle    Decimal   @db.Decimal(14, 2) @default(0)
+  grossValuation  Decimal   @default(0) @db.Decimal(14, 2)
+  retentionAmount Decimal   @default(0) @db.Decimal(14, 2)
+  previouslyCert  Decimal   @default(0) @db.Decimal(14, 2)
+  netThisCycle    Decimal   @default(0) @db.Decimal(14, 2)
   lastSavedAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -311,9 +336,9 @@ model AssessmentLine {
   indentLevel         Int      @default(0)
   variationId         String?
   qtyOrPctComplete    Decimal? @db.Decimal(8, 4)
-  valueToDate         Decimal  @db.Decimal(14, 2) @default(0)
-  previouslyCertified Decimal  @db.Decimal(14, 2) @default(0)
-  thisCycle           Decimal  @db.Decimal(14, 2) @default(0)
+  valueToDate         Decimal  @default(0) @db.Decimal(14, 2)
+  previouslyCertified Decimal  @default(0) @db.Decimal(14, 2)
+  thisCycle           Decimal  @default(0) @db.Decimal(14, 2)
   overrideCapFlag     Boolean  @default(false)
   notes               String?
   createdAt           DateTime @default(now())
@@ -327,18 +352,18 @@ model AssessmentLine {
 // ─── Notices ─────────────────────────────────────────────────────────────────
 
 model PaymentNotice {
-  id             String        @id @default(cuid())
-  paymentCycleId String        @unique
-  status         NoticeStatus  @default(DRAFT)
-  sumDue         Decimal       @db.Decimal(14, 2)
+  id             String         @id @default(cuid())
+  paymentCycleId String         @unique
+  status         NoticeStatus   @default(DRAFT)
+  sumDue         Decimal        @db.Decimal(14, 2)
   basis          String?
   pdfUrl         String?
   servedAt       DateTime?
   serviceMethod  ServiceMethod?
   servedByUserId String?
   deliveryLogId  String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   paymentCycle PaymentCycle @relation(fields: [paymentCycleId], references: [id], onDelete: Cascade)
 
@@ -346,18 +371,18 @@ model PaymentNotice {
 }
 
 model PayLessNotice {
-  id             String        @id @default(cuid())
-  paymentCycleId String        @unique
-  status         NoticeStatus  @default(DRAFT)
-  sumDue         Decimal       @db.Decimal(14, 2)
+  id             String         @id @default(cuid())
+  paymentCycleId String         @unique
+  status         NoticeStatus   @default(DRAFT)
+  sumDue         Decimal        @db.Decimal(14, 2)
   basis          String?
   pdfUrl         String?
   servedAt       DateTime?
   serviceMethod  ServiceMethod?
   servedByUserId String?
   deliveryLogId  String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   paymentCycle PaymentCycle @relation(fields: [paymentCycleId], references: [id], onDelete: Cascade)
 
@@ -391,7 +416,7 @@ model Variation {
 model RetentionLedger {
   id                 String    @id @default(cuid())
   subcontractOrderId String    @unique
-  totalHeld          Decimal   @db.Decimal(14, 2) @default(0)
+  totalHeld          Decimal   @default(0) @db.Decimal(14, 2)
   pcReleaseDate      DateTime?
   pcReleaseAmount    Decimal?  @db.Decimal(14, 2)
   pcReleasedAt       DateTime?

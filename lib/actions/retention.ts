@@ -15,7 +15,7 @@ const RetentionReleaseSchema = z.object({
 
 export async function updateRetentionDates(formData: FormData) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const raw = {
       orderId: formData.get("orderId") as string,
@@ -65,7 +65,7 @@ export async function updateRetentionDates(formData: FormData) {
 
 export async function markRetentionReleased(formData: FormData) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const orderId = formData.get("orderId") as string
     const releaseType = formData.get("releaseType") as "pc" | "mcd"

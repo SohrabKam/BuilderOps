@@ -23,7 +23,7 @@ export async function PUT(
 ) {
   try {
     const { id: orderId } = await params
-    const authResult = await requireOrgRoute()
+    const authResult = await requireOrgRoute({ minRole: "COMMERCIAL" })
     if (!authResult.ok) return authResult.response
     const { org } = authResult
 

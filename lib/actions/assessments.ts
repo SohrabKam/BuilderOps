@@ -17,7 +17,7 @@ function parseAmount(raw: FormDataEntryValue | null): number {
 // filling previouslyCertified from the most recently certified cycle.
 export async function initAssessment(cycleId: string) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const cycle = await db.paymentCycle.findFirst({
       where: {
@@ -138,7 +138,7 @@ export async function initAssessment(cycleId: string) {
 
 export async function logApplication(cycleId: string, formData: FormData) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const cycle = await db.paymentCycle.findFirst({
       where: {
@@ -195,7 +195,7 @@ export async function logApplication(cycleId: string, formData: FormData) {
 
 export async function updateApplication(applicationId: string, formData: FormData) {
   try {
-    const { org } = await requireOrgAction()
+    const { org } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const application = await db.application.findFirst({
       where: {

@@ -10,7 +10,7 @@ export async function updateScheduleLine(
   data: { itemRef: string; description: string; contractValue: number }
 ) {
   try {
-    const { org } = await requireOrgAction()
+    const { org } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const line = await db.activityScheduleLine.findFirst({
       where: { id: lineId, subcontractOrder: { organisationId: org.id } },
@@ -39,7 +39,7 @@ export async function addScheduleLine(
   data: { itemRef: string; description: string; contractValue: number }
 ) {
   try {
-    const { org } = await requireOrgAction()
+    const { org } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const order = await db.subcontractOrder.findFirst({
       where: { id: orderId, organisationId: org.id },
@@ -68,7 +68,7 @@ export async function addScheduleLine(
 
 export async function deleteScheduleLine(lineId: string) {
   try {
-    const { org } = await requireOrgAction()
+    const { org } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const line = await db.activityScheduleLine.findFirst({
       where: { id: lineId, subcontractOrder: { organisationId: org.id } },
@@ -86,7 +86,7 @@ export async function deleteScheduleLine(lineId: string) {
 
 export async function extendSchedule(orderId: string, newEndDateStr: string) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const order = await db.subcontractOrder.findFirst({
       where: { id: orderId, organisationId: org.id },

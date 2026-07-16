@@ -14,7 +14,7 @@ const schema = z.object({
 
 export async function createProject(formData: FormData) {
   try {
-    const { org } = await requireOrgAction()
+    const { org } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const data = schema.parse({
       name: formData.get("name"),
@@ -35,7 +35,7 @@ export async function createProject(formData: FormData) {
 
 export async function updateProject(formData: FormData) {
   try {
-    const { org } = await requireOrgAction()
+    const { org } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const projectId = formData.get("projectId") as string
     const data = schema.parse({

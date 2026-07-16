@@ -4,6 +4,7 @@ import { db } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { toSafeErrorMessage } from "@/lib/prisma-error"
+import { computeComplianceStatus } from "@/lib/compliance-status"
 
 const UpsertDocSchema = z.object({
   subcontractorId: z.string().min(1),
@@ -15,19 +16,9 @@ const UpsertDocSchema = z.object({
   fileUrl: z.string().url().optional().or(z.literal("")),
 })
 
-function computeStatus(issueDate?: string, expiryDate?: string): string {
-  if (!expiryDate) return issueDate ? "VALID" : "MISSING"
-  const expiry = new Date(expiryDate)
-  const now = new Date()
-  const thirtyDays = new Date(now.getTime() + 30 * 86_400_000)
-  if (expiry < now) return "EXPIRED"
-  if (expiry <= thirtyDays) return "EXPIRING_SOON"
-  return "VALID"
-}
-
 export async function upsertComplianceDoc(formData: FormData) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const raw = {
       subcontractorId: formData.get("subcontractorId") as string,
@@ -47,7 +38,7 @@ export async function upsertComplianceDoc(formData: FormData) {
     })
     if (!sub) throw new Error("Subcontractor not found")
 
-    const status = computeStatus(data.issueDate, data.expiryDate)
+    const status = computeComplianceStatus(data.issueDate, data.expiryDate)
 
     const fileUrl = data.fileUrl || undefined
 
@@ -59,7 +50,7 @@ export async function upsertComplianceDoc(formData: FormData) {
           issueDate: data.issueDate ? new Date(data.issueDate) : null,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
           notes: data.notes ?? null,
-          status: status as "VALID" | "EXPIRING_SOON" | "EXPIRED" | "MISSING",
+          status,
           ...(fileUrl ? { fileUrl } : {}),
         },
       })
@@ -71,7 +62,7 @@ export async function upsertComplianceDoc(formData: FormData) {
           issueDate: data.issueDate ? new Date(data.issueDate) : undefined,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
           notes: data.notes,
-          status: status as "VALID" | "EXPIRING_SOON" | "EXPIRED" | "MISSING",
+          status,
           fileUrl,
         },
       })

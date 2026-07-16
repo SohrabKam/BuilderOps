@@ -8,7 +8,7 @@ import { toSafeErrorMessage } from "@/lib/prisma-error"
 
 export async function markCyclePaid(cycleId: string) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const cycle = await db.paymentCycle.findFirst({
       where: {
@@ -67,7 +67,7 @@ export async function markCyclePaid(cycleId: string) {
 
 export async function setMilestoneApplicationDate(cycleId: string, applicationDateStr: string) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const cycle = await db.paymentCycle.findFirst({
       where: {
@@ -116,7 +116,7 @@ export async function setMilestoneApplicationDate(cycleId: string, applicationDa
 
 export async function closeCycle(cycleId: string, reason: string) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const cycle = await db.paymentCycle.findFirst({
       where: {

@@ -120,6 +120,51 @@ export default async function CycleWorkspacePage({
       }
     : null
 
+  // Same Decimal→number serialization for the other client components on
+  // this page, which each declare their own plain-number prop type.
+  const applicationForPanel = cycle.application
+    ? {
+        id: cycle.application.id,
+        amountApplied: Number(cycle.application.amountApplied),
+        dateReceived: cycle.application.dateReceived,
+        receivedVia: cycle.application.receivedVia,
+        notes: cycle.application.notes,
+        attachmentUrl: cycle.application.attachmentUrl,
+      }
+    : null
+
+  const paymentNoticeForPanel = cycle.paymentNotice
+    ? {
+        id: cycle.paymentNotice.id,
+        status: cycle.paymentNotice.status,
+        sumDue: Number(cycle.paymentNotice.sumDue),
+        basis: cycle.paymentNotice.basis,
+        servedAt: cycle.paymentNotice.servedAt,
+        serviceMethod: cycle.paymentNotice.serviceMethod,
+      }
+    : null
+
+  const payLessNoticeForPanel = cycle.payLessNotice
+    ? {
+        id: cycle.payLessNotice.id,
+        status: cycle.payLessNotice.status,
+        sumDue: Number(cycle.payLessNotice.sumDue),
+        basis: cycle.payLessNotice.basis,
+        servedAt: cycle.payLessNotice.servedAt,
+        serviceMethod: cycle.payLessNotice.serviceMethod,
+      }
+    : null
+
+  const assessmentForNoticePanel = cycle.assessment
+    ? {
+        id: cycle.assessment.id,
+        grossValuation: Number(cycle.assessment.grossValuation),
+        retentionAmount: Number(cycle.assessment.retentionAmount),
+        previouslyCert: Number(cycle.assessment.previouslyCert),
+        netThisCycle: Number(cycle.assessment.netThisCycle),
+      }
+    : null
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -220,8 +265,7 @@ export default async function CycleWorkspacePage({
         <TabsContent value="application" className="mt-4">
           <ApplicationPanel
             cycleId={id}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            application={cycle.application as any}
+            application={applicationForPanel}
           />
         </TabsContent>
 
@@ -229,12 +273,9 @@ export default async function CycleWorkspacePage({
           <NoticePanel
             cycleId={id}
             cycleStatus={cycle.status}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            paymentNotice={cycle.paymentNotice as any}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            payLessNotice={cycle.payLessNotice as any}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            assessment={cycle.assessment as any}
+            paymentNotice={paymentNoticeForPanel}
+            payLessNotice={payLessNoticeForPanel}
+            assessment={assessmentForNoticePanel}
             subcontractorName={order.subcontractor.name}
             paymentNoticeDeadline={new Date(cycle.paymentNoticeDeadline)}
             payLessDeadline={new Date(cycle.payLessDeadline)}

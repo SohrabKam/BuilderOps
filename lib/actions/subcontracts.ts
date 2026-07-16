@@ -17,7 +17,7 @@ const UpdateOrderSchema = z.object({
 
 export async function updateSubcontractSettings(formData: FormData) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const raw = {
       orderId: formData.get("orderId") as string,
@@ -81,7 +81,7 @@ export async function updateSubcontractSettings(formData: FormData) {
 
 export async function archiveSubcontract(orderId: string) {
   try {
-    const { org, userId } = await requireOrgAction()
+    const { org, userId } = await requireOrgAction({ minRole: "COMMERCIAL" })
 
     const order = await db.subcontractOrder.findFirst({
       where: { id: orderId, organisationId: org.id },

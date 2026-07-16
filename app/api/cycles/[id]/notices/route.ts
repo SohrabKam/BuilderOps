@@ -17,18 +17,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const authResult = await requireOrgRoute()
-  if (!authResult.ok) return authResult.response
-  const { org, userId } = authResult
-
   // Serving a statutory Payment/Pay-less Notice is a legally binding act —
   // Viewers must not be able to trigger it.
-  const member = await db.orgMember.findUnique({
-    where: { clerkUserId_organisationId: { clerkUserId: userId, organisationId: org.id } },
-  })
-  if (!member || member.role === "VIEWER") {
-    return NextResponse.json({ error: "Forbidden — requires Admin or Commercial role" }, { status: 403 })
-  }
+  const authResult = await requireOrgRoute({ minRole: "COMMERCIAL" })
+  if (!authResult.ok) return authResult.response
+  const { org, userId } = authResult
 
   const cycle = await db.paymentCycle.findFirst({
     where: {

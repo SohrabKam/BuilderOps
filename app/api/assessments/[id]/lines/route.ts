@@ -20,7 +20,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const authResult = await requireOrgRoute()
+  const authResult = await requireOrgRoute({ minRole: "COMMERCIAL" })
   if (!authResult.ok) return authResult.response
   const { org, userId } = authResult
 

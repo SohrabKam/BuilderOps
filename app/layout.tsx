@@ -16,7 +16,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
-      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <html
+        lang="en"
+        className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+        // next-themes sets style={{ colorScheme }} on this element directly
+        // (before paint, to avoid a flash of the wrong theme) regardless of
+        // where in the tree <ThemeProvider> is rendered — that intentionally
+        // differs from the server-rendered markup, and next-themes' own docs
+        // call for suppressing the resulting hydration warning here.
+        suppressHydrationWarning
+      >
         <body className="min-h-full bg-background text-foreground">
           {/* The app is styled for light mode only (no theme toggle exists
               anywhere in the UI) — forcedTheme keeps next-themes/Toaster
