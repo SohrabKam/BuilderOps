@@ -1,7 +1,9 @@
 import { PrismaClient } from "../lib/generated/prisma/client"
+import { PrismaNeon } from "@prisma/adapter-neon"
 import { generateCycles } from "../lib/dates/cycle-generator"
 
-const db = new PrismaClient()
+const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL })
+const db = new PrismaClient({ adapter })
 
 async function main() {
   const org = await db.organisation.findFirst()
